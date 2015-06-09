@@ -2,7 +2,7 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
-
+var session = require('express-session');
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -23,24 +23,24 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 
-app.get('/', 
+app.get('/',
 function(req, res) {
   res.render('index');
 });
 
-app.get('/create', 
+app.get('/create',
 function(req, res) {
   res.render('index');
 });
 
-app.get('/links', 
+app.get('/links',
 function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
-app.post('/links', 
+app.post('/links',
 function(req, res) {
   var uri = req.body.url;
 
@@ -48,9 +48,10 @@ function(req, res) {
     console.log('Not a valid url: ', uri);
     return res.send(404);
   }
-
+  // fetch gets a model from the database. it is like a SELECT query
   new Link({ url: uri }).fetch().then(function(found) {
     if (found) {
+      console.log(found);
       res.send(200, found.attributes);
     } else {
       util.getUrlTitle(uri, function(err, title) {
@@ -64,7 +65,7 @@ function(req, res) {
           title: title,
           base_url: req.headers.origin
         });
-
+        // save() is used to perform insert/update on a bookshelf model
         link.save().then(function(newLink) {
           Links.add(newLink);
           res.send(200, newLink);
@@ -77,6 +78,41 @@ function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+app.get('/login',
+function(req, res) {
+  res.render('login');
+});
+
+app.get('/signup',
+function(req, res) {
+  res.render('signup');
+});
+
+app.post('/signup', function(req, res){
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({ username: username }).fetch().then(function(found) {
+    if (found) {
+      res.redirect('/login');
+    } else {
+      var user = new User({
+        username: username,
+        password: password,
+      });
+
+      // save() is used to perform insert/update on a bookshelf model
+      user.save().then(function(newUser) {
+        console.log('newUser ', newUser);
+        Users.add(newUser);
+        res.send(200);
+      });
+
+    }
+  });
+});
+
+
 
 
 
