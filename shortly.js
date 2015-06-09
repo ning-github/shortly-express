@@ -143,13 +143,15 @@ app.post('/signup', function(req, res){
         password: password,
       });
 
-      // save() is used to perform insert/update on a bookshelf model
+      //save() is used to perform insert/update on a bookshelf model
       user.save().then(function(newUser) {
         console.log('newUser ', newUser);
         Users.add(newUser);
-
+        // create session
         sess = req.session;
+        // identify session as this user's
         sess.user = username;
+        // signing up is a successful login
         res.redirect('/create');
 
         res.send(200);
