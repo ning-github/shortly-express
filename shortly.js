@@ -83,6 +83,60 @@ function(req, res) {
   res.render('login');
 });
 
+app.post('/login', function(req, res){
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({ username: username }).fetch().then(function(model) {
+    if (!model) {
+      console.log('you don\'t exist');
+      res.redirect('/login');
+    } else {
+      var oldSalt = model.get('salt')
+      var oldPassword = model.get('password');  //salted + hashed
+      var newPassword = password; // not salted + not hashed
+
+      var testUser = new User({
+        password: oldPassword,
+        salt: oldSalt,
+      });
+
+      testUser.fetch().then(function(model){
+        console.log(model);
+        if (model.get('password') === oldPassword){
+          console.log('right password');
+        }else{
+          console.log('wrong password');
+        }
+      });
+
+
+
+      // console.log('model: ', model);
+      // var oldPassword = (password, oldSalt);
+      // console.log('old salt', oldSalt);
+      // console.log('old pass: ', oldPassword);
+
+
+      // user.fetch().then(function(model){
+      //   if (!model){
+
+      //   }
+      // });
+
+
+
+      // save() is used to perform insert/update on a bookshelf model
+      // user.save().then(function(newUser) {
+      //   console.log('newUser ', newUser);
+      //   Users.add(newUser);
+      //   res.send(200);
+      // });
+
+    }
+  });
+});
+
 app.get('/signup',
 function(req, res) {
   res.render('signup');
