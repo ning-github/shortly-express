@@ -21,14 +21,29 @@ app.use(bodyParser.json());
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
+app.use(session({
+  secret: 'keyboard cat',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false }
+}));
 
+var sess;
 
-app.get('/',
-function(req, res) {
+function restrict(req, res, next) {
+  if (req.session.user) {
+    next();
+  } else {
+    req.session.error = 'Access denied!';
+    res.redirect('/login');
+  }
+}
+
+app.get('/', restrict, function(req, res) {
   res.render('index');
 });
 
-app.get('/create',
+app.get('/create', restrict,
 function(req, res) {
   res.render('index');
 });
@@ -96,42 +111,15 @@ app.post('/login', function(req, res){
       var oldPassword = model.get('password');  //salted + hashed
       var newPassword = password; // not salted + not hashed
 
-      var testUser = new User({
-        password: oldPassword,
-        salt: oldSalt,
-      });
-
-      testUser.fetch().then(function(model){
-        console.log(model);
-        if (model.get('password') === oldPassword){
-          console.log('right password');
-        }else{
-          console.log('wrong password');
-        }
-      });
-
-
-
-      // console.log('model: ', model);
-      // var oldPassword = (password, oldSalt);
-      // console.log('old salt', oldSalt);
-      // console.log('old pass: ', oldPassword);
-
-
-      // user.fetch().then(function(model){
-      //   if (!model){
-
-      //   }
-      // });
-
-
-
-      // save() is used to perform insert/update on a bookshelf model
-      // user.save().then(function(newUser) {
-      //   console.log('newUser ', newUser);
-      //   Users.add(newUser);
-      //   res.send(200);
-      // });
+      var hashed = model.decrypt(newPassword, oldSalt);
+      if (oldPassword !== hashed){
+        res.redirect('/login');
+      }
+      else{ // entered the correct password
+        sess = req.session;
+        sess.user = username;
+        res.redirect('/create');
+      }
 
     }
   });
@@ -159,6 +147,11 @@ app.post('/signup', function(req, res){
       user.save().then(function(newUser) {
         console.log('newUser ', newUser);
         Users.add(newUser);
+
+        sess = req.session;
+        sess.user = username;
+        res.redirect('/create');
+
         res.send(200);
       });
 
@@ -166,6 +159,11 @@ app.post('/signup', function(req, res){
   });
 });
 
+app.get('/logout', function(req, res){
+  sess.destroy(function(){
+    res.redirect('login');
+  });
+});
 
 
 
