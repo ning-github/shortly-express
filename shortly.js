@@ -3,6 +3,12 @@ var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
+// passport
+var passport = require('passport');
+var GitHubStrategy = require('passport-github2').Strategy;
+
+var GITHUB_CLIENT_ID = "d1cd07060fe831923f32";
+var GITHUB_CLIENT_SECRET = "a9584cea99ccb9de7f3859de96693033c288e2cb";
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -13,6 +19,66 @@ var Click = require('./app/models/click');
 
 var app = express();
 
+
+passport.serializeUser(function(user, done) {
+  done(null, user);
+});
+
+passport.deserializeUser(function(obj, done) {
+  done(null, obj);
+});
+
+passport.use(new GitHubStrategy({
+    clientID: GITHUB_CLIENT_ID,
+    clientSecret: GITHUB_CLIENT_SECRET,
+    callbackURL: "http://127.0.0.1:4568/auth/github/callback"
+  },
+  function(accessToken, refreshToken, profile, done) {
+    // asynchronous verification, for effect...
+    new User({ username: profile.id }).fetch().then(function(found) {
+      if (found) {
+        return done(null, found);
+      }
+      else {
+        var user = new User({username: profile.id});
+        user.save().then(function(newUser) {
+          return done(null, newUser);
+        });
+      }
+    });
+  }
+));
+
+function ensureAuthenticated(req, res, next) {
+  console.log(req.isAuthenticated());
+  if (req.isAuthenticated()) { return next(); }
+  res.redirect('/login');
+}
+app.use(session({
+  secret: 'keyboard cat',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false }
+}));
+// passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.get('/auth/github',
+  passport.authenticate('github', { scope: [ 'user:email' ] }));
+
+// GET /auth/github/callback
+//   Use passport.authenticate() as route middleware to authenticate the
+//   request.  If authentication fails, the user will be redirected back to the
+//   login page.  Otherwise, the primary route function function will be called,
+//   which, in this example, will redirect the user to the home page.
+app.get('/auth/github/callback',
+  passport.authenticate('github', { failureRedirect: '/signup' }),
+  function(req, res) {
+    console.log('successfully authenticated');
+    res.redirect('/');
+  });
+
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
 app.use(partials());
@@ -21,32 +87,36 @@ app.use(bodyParser.json());
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
-app.use(session({
-  secret: 'keyboard cat',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false }
-}));
+
+
 
 var sess;
 
-function restrict(req, res, next) {
-  if (req.session.user) {
-    next();
-  } else {
-    req.session.error = 'Access denied!';
-    res.redirect('/login');
-  }
-}
+// function restrict(req, res, next) {
+//   if (req.session.user) {
+//     next();
+//   } else {
+//     req.session.error = 'Access denied!';
+//     res.redirect('/login');
+//   }
+// }
 
-app.get('/', restrict, function(req, res) {
+app.get('/', ensureAuthenticated, function(req, res) {
   res.render('index');
 });
+// app.get('/', restrict, function(req, res) {
+//   res.render('index');
+// });
 
-app.get('/create', restrict,
+app.get('/create',
 function(req, res) {
   res.render('index');
 });
+
+// app.get('/create', restrict,
+// function(req, res) {
+//   res.render('index');
+// });
 
 app.get('/links',
 function(req, res) {
@@ -162,9 +232,11 @@ app.post('/signup', function(req, res){
 });
 
 app.get('/logout', function(req, res){
-  sess.destroy(function(){
-    res.redirect('login');
-  });
+  // sess.destroy(function(){
+  //   res.redirect('login');
+  // });
+  req.logout();
+  res.redirect('/login');
 });
 
 
